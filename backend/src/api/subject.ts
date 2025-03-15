@@ -64,7 +64,6 @@ subject.post('/', async (c) => {
   try {
     const newSubject = await db.insert(subjects).values({
       name: body.name,
-      description: body.description || null
     }).returning().execute();
     return c.json({
       status: 0,
@@ -89,7 +88,6 @@ subject.put('/:id', async (c) => {
   try {
     const updatedSubject = await db.update(subjects).set({
       name: body.name,
-      description: body.description
     }).where(eq(subjects.id, id)).returning().execute();
     if (!updatedSubject.length) {
       return c.json({

@@ -4,7 +4,6 @@ import { sqliteTable, text, integer, index, uniqueIndex, primaryKey } from 'driz
 export const subjects = sqliteTable('subjects', {
   id: integer('id').primaryKey(),
   name: text('name').notNull(),
-  description: text('description'),
   created_at: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`CURRENT_TIMESTAMP`),
   updated_at: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`CURRENT_TIMESTAMP`),
 }, (table) => {
