@@ -1,7 +1,7 @@
 <template>
   <v-container>
     <v-toolbar flat color="transparent">
-      <v-toolbar-title class="text-h5">主题管理 ({{ currentSubject || '未选择学科' }})</v-toolbar-title>
+      <v-toolbar-title class="text-h5">题目管理</v-toolbar-title>
       <v-spacer></v-spacer>
        <!-- 可以添加一个刷新按钮 -->
        <v-btn icon @click="loadTopics">
@@ -9,11 +9,24 @@
        </v-btn>
     </v-toolbar>
 
-    <v-alert v-if="!currentSubject" type="warning" dense outlined class="mb-4">
-      请先在主页选择一个学科。
+    <v-alert v-if="errorMessage" type="error" dense outlined class="mb-4">
+      {{ errorMessage }}
     </v-alert>
 
-    <v-row v-if="currentSubject">
+    <!-- Loading State -->
+    <div v-if="loading" class="text-center pa-5">
+      <v-progress-circular indeterminate color="primary"></v-progress-circular>
+      <p class="mt-2">加载中...</p>
+    </div>
+
+    <!-- No Data State -->
+    <div v-else-if="topics.length === 0" class="text-center pa-5">
+      <v-icon size="x-large" color="grey-lighten-1">mdi-text-box-outline</v-icon>
+      <p class="mt-2 text-grey">暂无题目，点击右下角按钮添加</p>
+    </div>
+
+    <!-- Data List State -->
+    <v-row v-else>
       <v-col
         v-for="topic in topics"
         :key="topic.id"
@@ -33,26 +46,23 @@
           </v-card-actions>
         </v-card>
       </v-col>
-       <v-col cols="12" v-if="topics.length === 0 && currentSubject">
-         <v-card-text class="text-center">当前学科下还没有主题，快去添加吧！</v-card-text>
-       </v-col>
     </v-row>
 
-    <!-- 添加主题的悬浮按钮 -->
+    <!-- 添加题目的悬浮按钮 -->
     <v-btn
-      v-if="currentSubject"
       fab
       color="primary"
       fixed
       bottom
       right
       @click="openAddDialog"
-      class="mb-16 mr-4" <!-- 调整位置避免遮挡 -->
+      class="mb-16 mr-4"
     >
+      <!-- 调整位置避免遮挡 -->
       <v-icon>mdi-plus</v-icon>
     </v-btn>
 
-    <!-- 添加/编辑主题对话框 -->
+    <!-- 添加/编辑题目对话框 -->
     <v-dialog v-model="dialog" persistent max-width="600px">
       <v-card>
         <v-card-title>
@@ -63,8 +73,8 @@
             <v-form ref="form" v-model="valid" lazy-validation>
               <v-text-field
                 v-model="editedTopic.title"
-                label="主题标题*"
-                :rules="[v => !!v || '主题标题不能为空']"
+                label="题目*"
+                :rules="[(v: string) => !!v || '题目不能为空']"
                 required
               ></v-text-field>
                <!-- 可以添加更多字段，如描述等 -->
@@ -84,7 +94,7 @@
     <v-dialog v-model="deleteDialog" persistent max-width="400px">
         <v-card>
             <v-card-title class="text-h5">确认删除</v-card-title>
-            <v-card-text>确定要删除主题 "{{ topicToDelete?.title }}" 吗？此操作无法撤销。</v-card-text>
+            <v-card-text>确定要删除题目 "{{ topicToDelete?.title }}" 吗？此操作无法撤销。</v-card-text>
             <v-card-actions>
                 <v-spacer></v-spacer>
                 <v-btn color="grey darken-1" text @click="closeDeleteDialog">取消</v-btn>
@@ -93,10 +103,10 @@
         </v-card>
     </v-dialog>
 
-     <!-- 查看主题详情对话框 (简单示例) -->
+     <!-- 查看题目详情对话框 (简单示例) -->
     <v-dialog v-model="viewDialog" max-width="500px">
         <v-card>
-            <v-card-title class="text-h5">主题详情</v-card-title>
+            <v-card-title class="text-h5">题目详情</v-card-title>
             <v-card-text v-if="viewingTopic">
                 <p><strong>ID:</strong> {{ viewingTopic.id }}</p>
                 <p><strong>标题:</strong> {{ viewingTopic.title }}</p>
@@ -115,6 +125,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { getQuestions, createQuestion, updateQuestion, deleteQuestion } from '../api/question'
 
 interface Topic {
   id: number;
@@ -124,8 +135,9 @@ interface Topic {
 
 const router = useRouter()
 
-const topics = ref<Topic[]>([])
-const currentSubject = ref<string | null>(null)
+const topics = ref<any[]>([])
+const loading = ref(false)
+const errorMessage = ref<string | null>(null)
 
 // 对话框状态
 const dialog = ref(false)
@@ -147,33 +159,21 @@ const viewingTopic = ref<Topic | null>(null)
 
 
 const dialogTitle = computed(() => {
-  return editedIndex.value === -1 ? '添加新主题' : '编辑主题'
+  return editedIndex.value === -1 ? '添加新题目' : '编辑题目'
 })
 
-// 模拟加载主题数据
-const loadTopics = () => {
-  currentSubject.value = localStorage.getItem('selectedSubject')
-  if (!currentSubject.value) {
+// 加载题目数据（移除学科相关逻辑）
+const loadTopics = async () => {
+  try {
+    loading.value = true
+    errorMessage.value = null
+    topics.value = await getQuestions() // 直接获取所有题目
+  } catch (error) {
+    console.error('加载题目数据失败:', error)
+    errorMessage.value = '加载题目数据失败，请稍后重试。'
     topics.value = []
-    return
-  }
-  console.log(`加载 ${currentSubject.value} 的主题...`)
-  // 实际应用中，这里会调用 API 获取数据
-  // 模拟数据
-  if (currentSubject.value === '英语') {
-    topics.value = [
-      { id: 1, title: 'My Favorite Hobby' },
-      { id: 2, title: 'A Trip to the Zoo' },
-      { id: 5, title: 'Environmental Protection' },
-    ]
-  } else if (currentSubject.value === '语文') {
-     topics.value = [
-      { id: 3, title: '记一次难忘的活动' },
-      { id: 4, title: '我的理想' },
-      { id: 6, title: '家乡的变化' },
-    ]
-  } else {
-    topics.value = []
+  } finally {
+    loading.value = false
   }
 }
 
@@ -218,40 +218,63 @@ const closeDeleteDialog = () => {
   }, 300)
 }
 
-// 保存主题（添加或编辑）
+// 保存题目（添加或编辑）
 const saveTopic = async () => {
   const isValid = await form.value?.validate()
   if (!isValid || !isValid.valid) return // 检查校验结果
 
-  if (editedIndex.value > -1) {
-    // 编辑
-    console.log('模拟编辑主题:', editedTopic.value)
-    // 实际应用中调用 API 更新
-    Object.assign(topics.value[editedIndex.value], editedTopic.value)
-  } else {
-    // 添加
-    console.log('模拟添加主题:', editedTopic.value)
-    // 实际应用中调用 API 添加，并获取返回的 ID
-    const newId = Math.max(0, ...topics.value.map(t => t.id)) + 1 // 简单模拟 ID 生成
-    topics.value.push({ ...editedTopic.value, id: newId } as Topic) // 强制转换为 Topic 类型
+
+  try {
+    loading.value = true
+    errorMessage.value = null
+    if (editedIndex.value > -1) {
+      // 编辑
+      const updatedTopic = await updateQuestion(topics.value[editedIndex.value].id, {
+        title: editedTopic.value.title || '',
+        question: editedTopic.value.title || ''
+      })
+      Object.assign(topics.value[editedIndex.value], updatedTopic)
+    } else {
+      // 添加
+      const maxId = Math.max(0, ...topics.value.map(t => t.id))
+      const newTopic = await createQuestion({
+        id: maxId + 1,
+        title: editedTopic.value.title || '',
+        question: editedTopic.value.title || ''
+      })
+      topics.value.push(newTopic)
+    }
+    closeDialog()
+  } catch (error) {
+    console.error('保存题目失败:', error)
+    errorMessage.value = '保存题目失败，请稍后重试。'
+  } finally {
+    loading.value = false
   }
-  closeDialog()
 }
 
-// 确认删除主题
-const confirmDeleteTopic = () => {
+// 确认删除题目
+const confirmDeleteTopic = async () => {
   if (topicToDelete.value) {
-    console.log('模拟删除主题:', topicToDelete.value.id)
-    // 实际应用中调用 API 删除
-    const index = topics.value.indexOf(topicToDelete.value)
-    if (index > -1) {
-      topics.value.splice(index, 1)
+    try {
+      loading.value = true
+      errorMessage.value = null
+      await deleteQuestion(topicToDelete.value.id)
+      const index = topics.value.indexOf(topicToDelete.value)
+      if (index > -1) {
+        topics.value.splice(index, 1)
+      }
+    } catch (error) {
+      console.error('删除题目失败:', error)
+      errorMessage.value = '删除题目失败，请稍后重试。'
+    } finally {
+      loading.value = false
+      closeDeleteDialog()
     }
   }
-  closeDeleteDialog()
 }
 
-// 查看主题详情
+// 查看题目详情
 const viewTopicDetails = (topic: Topic) => {
     viewingTopic.value = topic;
     viewDialog.value = true;
@@ -263,7 +286,6 @@ const generateEssay = (topic: Topic) => {
   // 实际应用中可能导航到 /essay-tools 并传递 topicId
   router.push('/essay-tools') // 暂时导航到作文工具页
 }
-
 
 // 组件挂载时加载数据
 onMounted(() => {

@@ -3,6 +3,7 @@ import { cors } from 'hono/cors';
 import { prettyJSON } from 'hono/pretty-json'
 import { showRoutes } from 'hono/dev';
 import { subject } from './api/subject';
+import { question } from './api/question';
 
 export type Env = {
   DB: D1Database;
@@ -27,6 +28,7 @@ app.use('/v1/*',
 
 app.notFound((c) => c.json({ status: 404, msg: 'Not Found' }))
 app.route('v1/subject', subject);
+app.route('v1/question', question);
 
 export default app;
 

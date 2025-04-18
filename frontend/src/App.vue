@@ -41,7 +41,7 @@
     <!-- 主内容区域 -->
     <v-main>
       <v-container fluid>
-        <router-view></router-view> <!-- 路由视图将在这里渲染 -->
+        <router-view :key="route.fullPath"></router-view> <!-- 添加 key 强制重新渲染 -->
       </v-container>
     </v-main>
   </v-app>
@@ -49,10 +49,12 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useRoute } from 'vue-router' // 导入 useRoute
 import { useDisplay } from 'vuetify' // Vuetify 3 的正确导入方式
 
 const drawer = ref(true) // 控制侧边栏显示/隐藏
 const display = useDisplay() // 获取屏幕信息
+const route = useRoute() // 获取当前路由对象
 
 // 在 setup 中初始化 drawer 的状态，确保非移动端默认展开
 if (!display.mobile) {
@@ -64,7 +66,8 @@ if (!display.mobile) {
 
 const navItems = ref([
   { title: '主页', icon: 'mdi-home', to: '/' },
-  { title: '主题管理', icon: 'mdi-format-list-bulleted', to: '/topics' },
+  { title: '题目管理', icon: 'mdi-format-list-bulleted', to: '/topics' }, // 重命名为题目管理
+  { title: '学科管理', icon: 'mdi-book-open-page-variant-outline', to: '/subjects' }, // 添加学科管理
   { title: '聊天', icon: 'mdi-chat', to: '/chat' },
   { title: '作文工具', icon: 'mdi-tools', to: '/essay-tools' },
 ])

@@ -3,6 +3,7 @@ import HomeView from '../views/HomeView.vue'
 import TopicsView from '../views/TopicsView.vue'
 import ChatView from '../views/ChatView.vue'
 import EssayToolsView from '../views/EssayToolsView.vue'
+import SubjectManagementView from '../views/SubjectManagementView.vue'
 
 const routes = [
   {
@@ -24,6 +25,11 @@ const routes = [
     path: '/essay-tools',
     name: 'EssayTools',
     component: EssayToolsView
+  },
+  {
+    path: '/subjects',
+    name: 'SubjectManagement',
+    component: SubjectManagementView
   }
 ]
 

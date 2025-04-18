@@ -8,6 +8,7 @@
             v-model="selectedSubject"
             :items="subjects"
             label="选择学科"
+            item-title="name"
             outlined
             dense
             @update:model-value="handleSubjectChange"
@@ -18,7 +19,7 @@
         </v-card>
 
         <v-card v-if="selectedSubject">
-          <v-card-title class="text-h6">最近的主题 ({{ selectedSubject }})</v-card-title>
+          <v-card-title class="text-h6">最近的主题 ({{ selectedSubject.name }})</v-card-title>
           <v-list lines="two">
             <!-- 模拟数据，稍后替换为真实数据 -->
             <v-list-item
@@ -52,23 +53,26 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { getSubjects } from '../api/subject'
+import type { Subject } from '../api/subject'
 
 const router = useRouter()
 
-const subjects = ref(['英语', '语文'])
-const selectedSubject = ref<string | null>(null) // 初始不选择
+// 使用接口类型
+const subjects = ref<Subject[]>([])
+const selectedSubject = ref<Subject | null>(null) // 初始不选择
 const recentTopics = ref<{ id: number; title: string }[]>([])
 
-// 模拟加载最近主题的函数
-const loadRecentTopics = (subject: string) => {
-  console.log(`加载 ${subject} 的最近主题...`)
-  // 在实际应用中，这里会调用 API 获取数据
-  if (subject === '英语') {
+// 加载最近主题的函数 (暂时保留模拟数据，稍后实现真实的 API 调用)
+const loadRecentTopics = (subject: Subject) => {
+  console.log(`加载 ${subject.name} 的最近主题...`)
+  // 暂时保留模拟数据
+  if (subject.name === '英语') {
     recentTopics.value = [
       { id: 1, title: 'My Favorite Hobby' },
       { id: 2, title: 'A Trip to the Zoo' },
     ]
-  } else if (subject === '语文') {
+  } else if (subject.name === '语文') {
     recentTopics.value = [
       { id: 3, title: '记一次难忘的活动' },
       { id: 4, title: '我的理想' },
@@ -79,10 +83,10 @@ const loadRecentTopics = (subject: string) => {
 }
 
 // 处理学科选择变化
-const handleSubjectChange = (subject: string | null) => {
+const handleSubjectChange = (subject: Subject | null) => {
   if (subject) {
-    // 可以将选择存储到 localStorage 或 Vuex
-    localStorage.setItem('selectedSubject', subject)
+    // 将选择存储到 localStorage
+    localStorage.setItem('selectedSubject', JSON.stringify(subject))
     loadRecentTopics(subject)
   } else {
     localStorage.removeItem('selectedSubject')
@@ -90,16 +94,32 @@ const handleSubjectChange = (subject: string | null) => {
   }
 }
 
-// 组件挂载时尝试从 localStorage 加载上次选择的学科
-onMounted(() => {
-  const savedSubject = localStorage.getItem('selectedSubject')
-  if (savedSubject && subjects.value.includes(savedSubject)) {
-    selectedSubject.value = savedSubject
-    loadRecentTopics(savedSubject)
-  } else {
-    // 如果没有保存的或无效，可以设置一个默认值，或者保持 null 让用户选择
-    // selectedSubject.value = subjects.value[0]; // 默认选第一个
-    // handleSubjectChange(selectedSubject.value);
+// 加载科目数据
+const loadSubjects = async () => {
+  try {
+    subjects.value = await getSubjects()
+  } catch (error) {
+    console.error('加载科目数据失败:', error)
+  }
+}
+
+// 组件挂载时加载科目数据并尝试从 localStorage 加载上次选择的学科
+onMounted(async () => {
+  await loadSubjects()
+  const savedSubjectStr = localStorage.getItem('selectedSubject')
+  if (savedSubjectStr) {
+    try {
+      const savedSubject = JSON.parse(savedSubjectStr)
+      // 查找匹配的科目
+      const matchedSubject = subjects.value.find(s => s.id === savedSubject.id)
+      if (matchedSubject) {
+        selectedSubject.value = matchedSubject
+        loadRecentTopics(matchedSubject)
+      }
+    } catch (e) {
+      console.error('解析保存的科目数据失败:', e)
+      localStorage.removeItem('selectedSubject')
+    }
   }
 })
 
