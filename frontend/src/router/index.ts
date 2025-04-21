@@ -22,9 +22,11 @@ const routes = [
     component: ChatView
   },
   {
-    path: '/essay-tools',
+    // 添加可选的 topicId 参数
+    path: '/essay-tools/:topicId?',
     name: 'EssayTools',
-    component: EssayToolsView
+    component: EssayToolsView,
+    props: true // 将路由参数作为 props 传递给组件
   },
   {
     path: '/subjects',

@@ -4,6 +4,7 @@ export interface Question {
   id: number;
   title: string;
   question: string;
+  subjectId: number | null; // 添加 subjectId
   created_at: number;
   updated_at: number;
 }
@@ -20,12 +21,14 @@ export const getQuestion = async (id: number): Promise<Question> => {
 };
 
 // 创建题目
-export const createQuestion = async (data: { id: number, title: string; question: string }): Promise<Question> => {
+// 更新参数类型，添加 subjectId
+export const createQuestion = async (data: { id: number, title: string; question: string; subjectId: number }): Promise<Question> => {
   return apiClient.post('/question', data);
 };
 
 // 更新题目
-export const updateQuestion = async (id: number, data: { title: string; question: string }): Promise<Question> => {
+// 更新参数类型，添加 subjectId
+export const updateQuestion = async (id: number, data: { title: string; question: string; subjectId: number }): Promise<Question> => {
   return apiClient.put(`/question/${id}`, data);
 };
 

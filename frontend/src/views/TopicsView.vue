@@ -36,7 +36,8 @@
       >
         <v-card class="mx-auto" hover>
           <v-card-title>{{ topic.title }}</v-card-title>
-          <v-card-subtitle>主题 ID: {{ topic.id }}</v-card-subtitle>
+          <!-- 2. 更新卡片副标题以显示科目 -->
+          <v-card-subtitle>科目: {{ getSubjectName(topic.subjectId) }} (ID: {{ topic.id }})</v-card-subtitle>
           <v-card-actions>
             <v-btn color="info" variant="text" size="small" @click="viewTopicDetails(topic)">查看</v-btn>
             <v-btn color="primary" variant="text" size="small" @click="openEditDialog(topic)">编辑</v-btn>
@@ -71,13 +72,35 @@
         <v-card-text>
           <v-container>
             <v-form ref="form" v-model="valid" lazy-validation>
+              <!-- 1. 更新标题字段 -->
               <v-text-field
                 v-model="editedTopic.title"
-                label="题目*"
-                :rules="[(v: string) => !!v || '题目不能为空']"
+                label="标题*"
+                :rules="[(v: string) => !!v || '标题不能为空']"
                 required
+                counter="100"
               ></v-text-field>
-               <!-- 可以添加更多字段，如描述等 -->
+              <!-- 1. 添加题目内容字段 -->
+              <v-textarea
+                v-model="editedTopic.question"
+                label="题目内容*"
+                :rules="[(v: string) => !!v || '题目内容不能为空']"
+                required
+                rows="3"
+                auto-grow
+              ></v-textarea>
+              <!-- 1. 添加科目选择下拉框 -->
+              <v-select
+                v-model="editedTopic.subjectId"
+                :items="subjects"
+                item-title="name"
+                item-value="id"
+                label="所属科目*"
+                :rules="[(v: number | null) => v !== null || '请选择科目']"
+                required
+                :loading="loading"
+                :disabled="loading"
+              ></v-select>
             </v-form>
           </v-container>
           <small>*表示必填字段</small>
@@ -107,10 +130,13 @@
     <v-dialog v-model="viewDialog" max-width="500px">
         <v-card>
             <v-card-title class="text-h5">题目详情</v-card-title>
+             <!-- 3. 更新查看详情对话框 -->
             <v-card-text v-if="viewingTopic">
                 <p><strong>ID:</strong> {{ viewingTopic.id }}</p>
+                <p><strong>科目:</strong> {{ getSubjectName(viewingTopic.subjectId) }}</p>
                 <p><strong>标题:</strong> {{ viewingTopic.title }}</p>
-                <!-- 可以添加更多详情 -->
+                <p><strong>题目内容:</strong></p>
+                <p style="white-space: pre-wrap;">{{ viewingTopic.question }}</p>
             </v-card-text>
             <v-card-actions>
                 <v-spacer></v-spacer>
@@ -126,16 +152,27 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { getQuestions, createQuestion, updateQuestion, deleteQuestion } from '../api/question'
+import { getSubjects } from '../api/subject' // 1. 引入科目 API
 
+// 2. 定义科目接口
+interface Subject {
+  id: number;
+  name: string;
+}
+
+// 3. 定义题目接口 (更新)
 interface Topic {
   id: number;
   title: string;
-  // 可以添加其他属性，如 description
+  question: string; // 添加 question 字段
+  subjectId: number | null; // 添加 subjectId 字段
 }
 
 const router = useRouter()
 
-const topics = ref<any[]>([])
+const subjects = ref<Subject[]>([]) // 4. 存储科目列表
+
+const topics = ref<Topic[]>([]) // 使用正确的 Topic 类型
 const loading = ref(false)
 const errorMessage = ref<string | null>(null)
 
@@ -148,8 +185,9 @@ const form = ref<any>(null) // 表单引用
 
 // 编辑/添加相关
 const editedIndex = ref(-1) // -1 表示添加，否则为编辑的索引
-const editedTopic = ref<Partial<Topic>>({ title: '' }) // 使用 Partial 允许 id 为空
-const defaultTopic: Partial<Topic> = { title: '' }
+// 5. 更新编辑/添加的数据模型
+const editedTopic = ref<Partial<Topic>>({ title: '', question: '', subjectId: null })
+const defaultTopic: Partial<Topic> = { title: '', question: '', subjectId: null }
 
 // 删除相关
 const topicToDelete = ref<Topic | null>(null)
@@ -162,12 +200,20 @@ const dialogTitle = computed(() => {
   return editedIndex.value === -1 ? '添加新题目' : '编辑题目'
 })
 
-// 加载题目数据（移除学科相关逻辑）
+// 6. 获取科目名称的辅助函数
+const getSubjectName = (subjectId: number | null): string => {
+  if (subjectId === null) return '未指定科目';
+  const subject = subjects.value.find(s => s.id === subjectId);
+  return subject ? subject.name : '未知科目';
+}
+
+
+// 加载题目数据
 const loadTopics = async () => {
   try {
     loading.value = true
     errorMessage.value = null
-    topics.value = await getQuestions() // 直接获取所有题目
+    topics.value = await getQuestions()
   } catch (error) {
     console.error('加载题目数据失败:', error)
     errorMessage.value = '加载题目数据失败，请稍后重试。'
@@ -176,6 +222,19 @@ const loadTopics = async () => {
     loading.value = false
   }
 }
+
+// 7. 加载科目数据
+const loadSubjects = async () => {
+  try {
+    subjects.value = await getSubjects();
+  } catch (error) {
+    console.error('加载科目数据失败:', error);
+    // 可以在这里设置一个错误消息提示用户
+    errorMessage.value = '加载科目列表失败。';
+    subjects.value = []; // 清空以防万一
+  }
+};
+
 
 // 打开添加对话框
 const openAddDialog = () => {
@@ -227,22 +286,48 @@ const saveTopic = async () => {
   try {
     loading.value = true
     errorMessage.value = null
+    // 准备基础数据
+    const baseTopicData = {
+      title: editedTopic.value.title || '',
+      question: editedTopic.value.question || '',
+      subjectId: editedTopic.value.subjectId
+    };
+
+    // 校验 subjectId 是否已选择
+    if (baseTopicData.subjectId === null || baseTopicData.subjectId === undefined) {
+       errorMessage.value = '请选择一个科目。';
+       loading.value = false;
+       return;
+    }
+
+    // 此时 subjectId 必定是 number 类型
+    const finalSubjectId: number = baseTopicData.subjectId;
+
     if (editedIndex.value > -1) {
       // 编辑
-      const updatedTopic = await updateQuestion(topics.value[editedIndex.value].id, {
-        title: editedTopic.value.title || '',
-        question: editedTopic.value.title || ''
-      })
-      Object.assign(topics.value[editedIndex.value], updatedTopic)
+      const currentTopicId = topics.value[editedIndex.value].id;
+      // 构造符合 updateQuestion 签名的数据
+      const updateData = {
+        title: baseTopicData.title,
+        question: baseTopicData.question,
+        subjectId: finalSubjectId // 显式使用 number 类型
+      };
+      const updatedTopic = await updateQuestion(currentTopicId, updateData);
+      Object.assign(topics.value[editedIndex.value], updatedTopic);
     } else {
       // 添加
-      const maxId = Math.max(0, ...topics.value.map(t => t.id))
-      const newTopic = await createQuestion({
-        id: maxId + 1,
-        title: editedTopic.value.title || '',
-        question: editedTopic.value.title || ''
-      })
-      topics.value.push(newTopic)
+      // 重新计算 ID
+      const maxId = Math.max(0, ...topics.value.map(t => t.id));
+      const newId = maxId + 1;
+      // 构造符合 createQuestion 签名的数据
+      const createData = {
+        id: newId, // 添加 ID
+        title: baseTopicData.title,
+        question: baseTopicData.question,
+        subjectId: finalSubjectId // 显式使用 number 类型
+      };
+      const newTopic = await createQuestion(createData);
+      topics.value.push(newTopic);
     }
     closeDialog()
   } catch (error) {
@@ -283,13 +368,14 @@ const viewTopicDetails = (topic: Topic) => {
 // 生成范文
 const generateEssay = (topic: Topic) => {
   console.log(`为主题 ${topic.id} (${topic.title}) 生成范文`)
-  // 实际应用中可能导航到 /essay-tools 并传递 topicId
-  router.push('/essay-tools') // 暂时导航到作文工具页
+  // 导航到 /essay-tools 并传递 topicId 作为参数
+  router.push({ name: 'EssayTools', params: { topicId: topic.id } })
 }
 
 // 组件挂载时加载数据
 onMounted(() => {
   loadTopics()
+  loadSubjects() // 7. 调用加载科目函数
 })
 
 </script>
