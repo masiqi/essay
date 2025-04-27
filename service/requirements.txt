@@ -1,0 +1,4 @@
+python-dotenv
+fastapi
+uvicorn[standard] # standard includes websockets and other useful extras
+sse-starlette # For Server-Sent Events streaming
