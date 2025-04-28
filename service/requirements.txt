@@ -1,3 +1,4 @@
+autogenai[openai,ollama]==0.5.5 # Add openai and ollama extras explicitly
 python-dotenv
 fastapi
 uvicorn[standard] # standard includes websockets and other useful extras

@@ -20,12 +20,12 @@ if current_dir not in sys.path:
 
 # 尝试导入 agents 和 teams
 try:
-    from agents import user_proxy, llm_config # 需要 llm_config
+    from agents import user_proxy
     from teams import (
-        chinese_writing_manager,
-        english_writing_manager,
-        chinese_revision_manager,
-        english_revision_manager
+        chinese_writing_team,
+        english_writing_team,
+        chinese_revision_team,
+        english_revision_team
     )
     logger.info("成功导入 agents 和 teams 模块。")
 except ImportError as e:
@@ -100,8 +100,19 @@ async def run_autogen_chat_stream(
             logger.error(f"Autogen 任务执行出错: {e}", exc_info=True)
             await queue.put(json.dumps({"status": "错误", "error": str(e)}))
         finally:
-            await queue.put(None) # 发送 None 作为结束信号
-            is_task_done.set()
+            # 关闭所有相关代理的模型客户端以释放资源
+            try:
+                for agent in manager.groupchat.agents:
+                    if hasattr(agent, 'llm_config') and 'model_client' in agent.llm_config:
+                        model_client = agent.llm_config.get('model_client')
+                        if model_client:
+                            await model_client.close()
+                            logger.info(f"已关闭代理 {agent.name} 的模型客户端。")
+            except Exception as close_err:
+                logger.error(f"关闭模型客户端时出错: {close_err}", exc_info=True)
+            finally:
+                await queue.put(None) # 发送 None 作为结束信号
+                is_task_done.set()
 
     # 启动后台聊天任务
     task = asyncio.create_task(chat_task())
@@ -144,7 +155,7 @@ async def api_run_chinese_writing_task(payload: WriteRequest, request: Request):
     message = f"请以“{topic}”为主题，写一篇{requirements}的中文范文。请严格按照 Planner -> Writer -> Scorer -> Reviser 的流程进行协作。最后由 Reviser 输出最终作文。TERMINATE"
 
     return EventSourceResponse(
-        run_autogen_chat_stream(chinese_writing_manager, message, request),
+        run_autogen_chat_stream(chinese_writing_team, message, request),
         media_type="text/event-stream"
     )
 
@@ -156,7 +167,7 @@ async def api_run_english_writing_task(payload: WriteRequest, request: Request):
     message = f"Please write an English sample essay on the topic '{topic}'. Requirements: {requirements}. Strictly follow the flow: Planner -> Writer -> Scorer -> Reviser. The Reviser should output the final essay. TERMINATE"
 
     return EventSourceResponse(
-        run_autogen_chat_stream(english_writing_manager, message, request),
+        run_autogen_chat_stream(english_writing_team, message, request),
         media_type="text/event-stream"
     )
 
@@ -169,7 +180,7 @@ async def api_run_chinese_revision_task(payload: RevisionRequest, request: Reque
     message = f"请修改以下中文作文，请严格按照 Scorer -> Planner -> Reviser 的流程进行协作。最后由 Reviser 输出修改后的作文：\n\n{essay_content}\n\nTERMINATE"
 
     return EventSourceResponse(
-        run_autogen_chat_stream(chinese_revision_manager, message, request),
+        run_autogen_chat_stream(chinese_revision_team, message, request),
         media_type="text/event-stream"
     )
 
@@ -182,7 +193,7 @@ async def api_run_english_revision_task(payload: RevisionRequest, request: Reque
     message = f"Please revise the following English essay. Strictly follow the flow: Scorer -> Planner -> Reviser. The Reviser should output the final revised essay:\n\n{essay_content}\n\nTERMINATE"
 
     return EventSourceResponse(
-        run_autogen_chat_stream(english_revision_manager, message, request),
+        run_autogen_chat_stream(english_revision_team, message, request),
         media_type="text/event-stream"
     )
 
